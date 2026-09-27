@@ -1,0 +1,15 @@
+{
+  "stale_error_code": "E_STALE_SEGMENT",
+  "backward_error_code": "E_BACKWARD_CHECKPOINT",
+  "event_error_code": "E_BAD_EVENT",
+  "budget": 1,
+  "state": { "checkpoint": 0, "segments": [], "retired": [], "reclaimed": [], "applied": [] },
+  "events": [
+    { "id": 1, "kind": "append", "segment": 1 },
+    { "id": 2, "kind": "append", "segment": 2 },
+    { "id": 3, "kind": "checkpoint", "upto": 1 },
+    { "id": 4, "kind": "append", "segment": 3 },
+    { "id": 5, "kind": "checkpoint", "upto": 3 },
+    { "id": 6, "kind": "append", "segment": 4 }
+  ]
+}
