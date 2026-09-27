@@ -106,4 +106,44 @@ for (const [label, want] of Object.entries(EXPECTED)) {
   else { __bad += 1; console.log("不一致 " + label + " 期望 " + JSON.stringify(want) + " 实际 " + JSON.stringify(got)); }
 }
 console.log("验收项 " + (Object.keys(EXPECTED).length - __bad) + "/" + Object.keys(EXPECTED).length + " 通过");
+
+// ---- 七条机检断言：每条直接调用实现取真值，断言失败计入退出码 ----
+function __probeCode(fn) {
+  try { fn(); return null; } catch (error) { return error && error.code ? error.code : null; }
+}
+const __emptyState = function (checkpoint) {
+  return { checkpoint: checkpoint, segments: [], retired: [], reclaimed: [], applied: [] };
+};
+const __probes = {
+  stale: __probeCode(function () {
+    step({ state: __emptyState(2), events: [{ id: 1, kind: "append", "segment": 2 }], budget: 1 });
+  }),
+  backward: __probeCode(function () {
+    step({ state: __emptyState(3), events: [{ id: 1, kind: "checkpoint", upto: 1 }], budget: 1 });
+  }),
+  bad: __probeCode(function () {
+    step({ state: __emptyState(0), events: [{ id: 1, kind: "peek" }], budget: 1 });
+  })
+};
+const __assertions = [
+  ["两档回收不同", first.reclaimed_count !== wide.reclaimed_count],
+  ["收尾前待回收段大于零而收尾后归零", first.pending_before > 0 && closed.state.retired.length === 0],
+  ["拆两轮中间态不同而收尾态一致",
+    fingerprint(r2.state) !== fingerprint(first.state)
+      && fingerprint(closedTwo.state) === fingerprint(closed.state)],
+  ["重放不再回收", replay.reclaimed_count === 0],
+  ["工作计数不超事件条数", first.judged <= events.length],
+  ["与全量对照为零", fingerprint(closed.state) === fingerprint(fullClosed.state)],
+  ["状态异常探针真调",
+    __probes.stale === (spec.stale_error_code || "E_STALE_SEGMENT")
+      && __probes.backward === (spec.backward_error_code || "E_BACKWARD_CHECKPOINT")
+      && __probes.bad === (spec.event_error_code || "E_BAD_EVENT")]
+];
+let __assertBad = 0;
+__assertions.forEach(function (pair, index) {
+  if (pair[1]) { console.log("断言" + (index + 1) + " 通过 " + pair[0]); }
+  else { __assertBad += 1; __bad += 1; console.log("断言" + (index + 1) + " 失败 " + pair[0]); }
+});
+console.log("机检断言 " + (__assertions.length - __assertBad) + "/" + __assertions.length + " 通过");
+
 process.exit(__bad === 0 ? 0 : 1);
